@@ -16,11 +16,10 @@ import admin
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-dp.include_router(admin.router)  # Подключаем админ-панель
+dp.include_router(admin.router)
 
 ai = AstroAI(auth_key=GIGA_AUTH_KEY)
 
-# FSM-состояния для диалогов
 class UserState(StatesGroup):
     waiting_partner_sign = State()
     waiting_question = State()
@@ -46,17 +45,17 @@ PROMPT_PREMIUM = """Ты — профессиональный астролог. 
 🍀 Числа и цвета дня
 120-150 слов, глубокий и практичный. В конце: «Индивидуальный прогноз для подписчика 💎»"""
 
-# Простой кэш в оперативной памяти (сбрасывается при перезапуске бота)
 horoscope_cache = {}
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
-    await state.clear()  # Сбрасываем зависшие состояния
+    await state.clear()
     await db.create_user(message.from_user.id)
     user = await db.get_user(message.from_user.id)
     
-    # user[1] — это знак зодиака в вашей БД
+    # user[1] = zodiac
     if user and user[1]:
+        logging.info(f"✅ Пользователь {message.from_user.id} уже имеет знак: {user[1]}")
         await message.answer(f"Привет, {message.from_user.full_name}! 🌟\nМеню: /horoscope /week /ask /compatibility /premium")
     else:
         kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -77,7 +76,12 @@ async def get_horoscope(message: types.Message):
     await db.create_user(message.from_user.id)
     user = await db.get_user(message.from_user.id)
     
+    # Отладка в консоли
+    print(f"[DEBUG] /horoscope вызван. User ID: {message.from_user.id}")
+    print(f"[DEBUG] Данные из БД: {user}")
+    
     if not user or not user[1]:
+        print(f"[DEBUG] Знак зодиака НЕ НАЙДЕН. Прерываю.")
         return await message.answer("Сначала выбери знак зодиака через /start")
 
     is_prem = await db.is_premium(message.from_user.id)
@@ -201,7 +205,7 @@ async def check_pay(call: types.CallbackQuery):
 async def main():
     await db.init_db()
     logging.info("📦 База данных инициализирована")
-    logging.info("🤖 Бот запущен в режиме polling! Нажмите /start")
+    logging.info("🤖 Бот запущен. Жду команды...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
